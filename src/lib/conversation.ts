@@ -7,6 +7,7 @@ export interface ChatLine {
 
 export interface ChemistryResult {
   score: number;
+  tikitaka: number;
   goodPoints: string[];
   concerns: string[];
   verdict: string;
@@ -24,15 +25,16 @@ export const MODEL_OPTIONS: { value: string; label: string }[] = [
   { value: "gemini-3.5-flash", label: "3.5 Flash" },
   { value: "gemini-3.1-flash-lite", label: "3.1 Flash-Lite" },
   { value: "gemini-3.1-flash-lite-preview", label: "3.1 Flash-Lite Preview" },
+  { value: "gemini-3.1-pro-preview", label: "3.1 Pro Preview" },
   { value: "gemini-2.5-flash", label: "2.5 Flash" },
   { value: "gemini-2.5-flash-lite", label: "2.5 Flash-Lite" },
   { value: "gemini-2.5-pro", label: "2.5 Pro" },
 ];
 
 export interface DateResult {
-  venue: Venue;
+  venue: Venue | null;
   conversation: ChatLine[];
-  chemistry: ChemistryResult;
+  chemistry?: ChemistryResult | null;
   modelUsed?: string;
 }
 

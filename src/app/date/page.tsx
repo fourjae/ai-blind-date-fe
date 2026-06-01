@@ -37,9 +37,6 @@ export default function DatePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const runDate = useCallback((a: Persona, b: Persona, model: string) => {
-    // 이전 결과 초기화 후 재생성
-    setScript([]);
-    setVisible([]);
     setTyping(null);
     setResult(null);
     setVenue(null);
@@ -50,7 +47,10 @@ export default function DatePage() {
 
     fetchDateResult(a, b, model || undefined)
       .then(({ venue, conversation, chemistry, modelUsed }) => {
-        chemistryRef.current = chemistry;
+        // 새 대화가 도착하면 그때 이전 대화를 교체한다
+        setVisible([]);
+        setScript([]);
+        chemistryRef.current = chemistry ?? null;
         setVenue(venue);
         setModelUsed(modelUsed ?? null);
         setScript(conversation);
@@ -273,7 +273,7 @@ export default function DatePage() {
               ref={scrollRef}
               className="px-5 py-5 space-y-3 h-[420px] overflow-y-auto bg-rose-50/30"
             >
-              {generating && (
+              {generating ? (
                 <div className="h-full flex flex-col items-center justify-center text-center">
                   <div className="text-4xl mb-3 animate-pulse">💕</div>
                   <p className="text-sm text-rose-900/55">
@@ -287,8 +287,7 @@ export default function DatePage() {
                     모델로 생성 중
                   </p>
                 </div>
-              )}
-              {!generating && loadError ? (
+              ) : loadError && visible.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center px-4">
                   <div className="text-3xl mb-2">😢</div>
                   <p className="text-sm text-rose-900/60 mb-1">
@@ -308,6 +307,13 @@ export default function DatePage() {
                   ))}
                   {typing !== null && (
                     <TypingBubble speaker={typing} pair={pair} />
+                  )}
+                  {loadError && (
+                    <div className="mt-2 px-3 py-2 rounded-xl bg-rose-50 border border-rose-100 text-center">
+                      <p className="text-[11px] text-rose-400">
+                        ⚠ 재생성 실패 — {loadError}
+                      </p>
+                    </div>
                   )}
                 </>
               )}

@@ -2,9 +2,9 @@ import type { Persona } from "@/lib/personas";
 import type { ChatLine, ChemistryResult, Venue } from "@/lib/conversation";
 
 interface DateResult {
-  venue: Venue;
+  venue: Venue | null;
   conversation: ChatLine[];
-  chemistry: ChemistryResult;
+  chemistry?: ChemistryResult | null;
 }
 
 function genderKo(gender: Persona["gender"]) {
@@ -59,19 +59,18 @@ ${b.personaText}
   ],
   "chemistry": {
     "score": 정수,
+    "tikitaka": 정수,
     "verdict": "한 줄 총평 (이모지 포함)",
     "goodPoints": ["...", "...", "..."],
     "concerns": ["...", "..."]
   }
 }
-score는 두 사람의 실제 궁합을 솔직하게 반영한 30~99 사이 정수(잘 안 맞으면 낮게). verdict는 점수에 맞는 솔직한 톤. goodPoints 2~3개, concerns 1~2개, 대화에서 실제로 드러난 근거로.`;
+score는 두 사람의 실제 궁합을 솔직하게 반영한 30~99 사이 정수(잘 안 맞으면 낮게). tikitaka는 대화의 티키타카 밀도를 반영한 30~99 사이 정수 — 맞장구·말 이어받기·농담 캐치볼이 활발할수록 높고, 대화가 뚝뚝 끊기거나 한쪽만 떠들면 낮게. tikitaka는 score와 독립적으로 평가해(궁합은 좋아도 말수가 적은 조합은 tikitaka가 낮을 수 있음). verdict는 점수에 맞는 솔직한 톤. goodPoints 2~3개, concerns 1~2개, 대화에서 실제로 드러난 근거로.`;
 }
 
-function isValidResult(r: unknown): r is DateResult {
+function hasValidConversation(r: unknown): boolean {
   if (!r || typeof r !== "object") return false;
-  const obj = r as Record<string, unknown>;
-  const conv = obj.conversation;
-  const chem = obj.chemistry as Record<string, unknown> | undefined;
+  const conv = (r as Record<string, unknown>).conversation;
   return (
     Array.isArray(conv) &&
     conv.length > 0 &&
@@ -81,9 +80,19 @@ function isValidResult(r: unknown): r is DateResult {
         typeof l === "object" &&
         (l as ChatLine).speaker !== undefined &&
         typeof (l as ChatLine).text === "string",
-    ) &&
+    )
+  );
+}
+
+function isValidResult(r: unknown): r is DateResult {
+  if (!hasValidConversation(r)) return false;
+  const chem = (r as Record<string, unknown>).chemistry as
+    | Record<string, unknown>
+    | undefined;
+  return (
     !!chem &&
     typeof chem.score === "number" &&
+    typeof chem.tikitaka === "number" &&
     Array.isArray(chem.goodPoints) &&
     Array.isArray(chem.concerns)
   );
@@ -153,16 +162,29 @@ async function callModel(
   } catch {
     return { ok: false, error: "JSON 파싱 실패" };
   }
+  const normalizeConv = (conv: ChatLine[]) =>
+    conv.map((line) => ({
+      ...line,
+      speaker: (Number(line.speaker) === 1 ? 1 : 0) as 0 | 1,
+    }));
+
   if (!isValidResult(parsed)) {
-    return { ok: false, error: "형식 불일치" };
+    if (!hasValidConversation(parsed)) {
+      return { ok: false, error: "형식 불일치" };
+    }
+    // 대화는 왔지만 chemistry/venue 가 없는 부분 응답 — 대화만 표시한다.
+    const p = parsed as Record<string, unknown>;
+    return {
+      ok: true,
+      result: {
+        venue: (p.venue as Venue) ?? null,
+        conversation: normalizeConv(p.conversation as ChatLine[]),
+        chemistry: (p.chemistry as ChemistryResult) ?? null,
+      },
+    };
   }
 
-  // speaker 를 항상 0/1 숫자로 정규화 (Gemini 가 문자열로 줄 때 대비).
-  parsed.conversation = parsed.conversation.map((line) => ({
-    ...line,
-    speaker: Number(line.speaker) === 1 ? 1 : 0,
-  }));
-
+  parsed.conversation = normalizeConv(parsed.conversation as ChatLine[]);
   return { ok: true, result: parsed };
 }
 
